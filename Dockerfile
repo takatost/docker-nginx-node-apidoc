@@ -12,7 +12,7 @@ ENV LANG C.UTF-8
 RUN apk add --no-cache ca-certificates
 
 ENV GPG_KEY C01E1CAD5EA2C4F0B8E3571504C367C218ADD4FF
-ENV PYTHON_VERSION 2.7.13
+ENV PYTHON_VERSION 2.7.14
 
 RUN set -ex \
 	&& apk add --no-cache --virtual .fetch-deps \
@@ -63,20 +63,19 @@ RUN set -ex \
 	&& make install \
 	\
 	&& runDeps="$( \
-		scanelf --needed --nobanner --recursive /usr/local \
-			| awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
+		scanelf --needed --nobanner --format '%n#p' --recursive /usr/local \
+			| tr ',' '\n' \
 			| sort -u \
-			| xargs -r apk info --installed \
-			| sort -u \
+			| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
 	)" \
 	&& apk add --virtual .python-rundeps $runDeps \
 	&& apk del .build-deps \
 	\
 	&& find /usr/local -depth \
 		\( \
-			\( -type d -a -name test -o -name tests \) \
+			\( -type d -a \( -name test -o -name tests \) \) \
 			-o \
-			\( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
+			\( -type f -a \( -name '*.pyc' -o -name '*.pyo' \) \) \
 		\) -exec rm -rf '{}' + \
 	&& rm -rf /usr/src/python
 
@@ -100,13 +99,13 @@ RUN set -ex; \
 	\
 	find /usr/local -depth \
 		\( \
-			\( -type d -a -name test -o -name tests \) \
+			\( -type d -a \( -name test -o -name tests \) \) \
 			-o \
-			\( -type f -a -name '*.pyc' -o -name '*.pyo' \) \
+			\( -type f -a \( -name '*.pyc' -o -name '*.pyo' \) \) \
 		\) -exec rm -rf '{}' +; \
 	rm -f get-pip.py
 
-ENV NGINX_VERSION 1.13.1
+ENV NGINX_VERSION 1.13.7
 
 RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& CONFIG="\
@@ -222,11 +221,10 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& mv /usr/bin/envsubst /tmp/ \
 	\
 	&& runDeps="$( \
-		scanelf --needed --nobanner /usr/sbin/nginx /usr/lib/nginx/modules/*.so /tmp/envsubst \
-			| awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
+		scanelf --needed --nobanner --format '%n#p' /usr/sbin/nginx /usr/lib/nginx/modules/*.so /tmp/envsubst \
+			| tr ',' '\n' \
 			| sort -u \
-			| xargs -r apk info --installed \
-			| sort -u \
+			| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
 	)" \
 	&& apk add --no-cache --virtual .nginx-rundeps $runDeps \
 	&& apk del .build-deps \
